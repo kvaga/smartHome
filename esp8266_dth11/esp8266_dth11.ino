@@ -38,36 +38,18 @@ void setup()
   //  influx.setToken(“myToken");
 }
 
-/*
-void getTH(byte* _temperature, byte* _humidity) {
+
+int getTH(byte* temperature, byte* humidity) {
   byte data[40] = {0};
-  byte temperature;
-  byte humidity;
-  if (dht11.read(pinDHT11, &temperature, &humidity, data)) {
+  if (dht11.read(pinDHT11, temperature, humidity, data)) {
     Serial.println("Read DHT11 failed");
-    return;
+    return -1;
   }
-  //  Serial.print("Sample RAW Bits: ");
-  //  for (int i = 0; i < 40; i++) {
-  //    Serial.print((int)data[i]);
-  //    if (i > 0 && ((i + 1) % 4) == 0) {
-  //      Serial.print(' ');
-  //    }
-  //  }
-  //  Serial.println("");
-  _temperature = &temperature;
-  _humidity = &humidity;
-  Serial.println("Before");
-  Serial.print((int)_temperature); Serial.print(" *C, ");
-  Serial.print((int)_humidity); Serial.println(" %");
-
-  //  Serial.print((int)temperature); Serial.print(" *C, ");
-  //  Serial.print((int)humidity); Serial.println(" %");
-
-  //  sprintf(lcd_temperature_text, "%d\xDF Temperature", (int)temperature);
-  //  sprintf(lcd_humidity_text, "%d%% Humidity",(int)humidity);
+//  Serial.print(*temperature); Serial.print(" *C, ");
+//  Serial.print(*humidity); Serial.println(" %");
+  return 0;
 }
-*/
+
 
 String ipAddress2String(const IPAddress& ipAddress)
 {
@@ -77,14 +59,14 @@ String ipAddress2String(const IPAddress& ipAddress)
          String(ipAddress[3])  ;
 }
 
-void send_humidity_temperature() {
+int send_humidity_temperature() {
   byte data[40] = {0};
-  byte temperature;
-  byte humidity;
+  byte temperature=0;
+  byte humidity=0;
 
-  if (dht11.read(pinDHT11, &temperature, &humidity, data)) {
-    Serial.println("Read DHT11 failed");
-    return;
+  if(getTH(&temperature,&humidity)<0){
+    Serial.println("Nothing to send to the InfluxDB becuase an error was occured on DTH11");
+    return -1;
   }
 
   InfluxData row_temperature("dth11_temperature");
@@ -97,11 +79,10 @@ void send_humidity_temperature() {
   row_humidity.addValue("value", (int) humidity);
   influx.write(row_humidity);
 
-  delay(5000);
+//  delay(5000);
 }
 
 void loop()
 {
   send_humidity_temperature();
-  delay(5000);
 }
