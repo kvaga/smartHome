@@ -65,7 +65,7 @@ int send_humidity_temperature() {
   byte humidity=0;
 
   if(getTH(&temperature,&humidity)<0){
-    Serial.println("Nothing to send to the InfluxDB becuase an error was occured on DTH11");
+    Serial.println("Nothing to send to the InfluxDB because an error was occured on DTH11");
     return -1;
   }
 
