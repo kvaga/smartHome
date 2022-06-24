@@ -228,7 +228,7 @@ void loop() {
  */
 int checkHumidityExceeded(byte* humidity){
   unsigned int humidityInt = (/*(humidity[2]<<16)+(humidity[1]<<8)+*/humidity[0]);
-  int HUMIDITY_THRESHOLD = 37;
+  int HUMIDITY_THRESHOLD = 45;
   if(humidityInt>HUMIDITY_THRESHOLD){
     log_warn((String)"Humidity ["+humidityInt+"] threshold [" + HUMIDITY_THRESHOLD + "] was excedeed");
     return -1;
@@ -265,7 +265,7 @@ int getTH(byte* temperature, byte* humidity) {
  *  if you are using normally-closed configuration send HIGH signal
  */
 void relayCurrentStop(){
-    digitalWrite(RELAY_PIN, HIGH);
+    digitalWrite(RELAY_PIN, LOW);
     log("Current not flowing");
 }
 
@@ -274,6 +274,6 @@ void relayCurrentStop(){
  *  if you are using normally-closed configuration send HIGH signal
  */
 void relayCurrentStart(){
-  digitalWrite(RELAY_PIN, LOW);
+  digitalWrite(RELAY_PIN, HIGH);
   log_warn("Current flowing...");
 }
