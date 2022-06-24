@@ -62,12 +62,30 @@ Point sensor_mhz19("mhz19");
 
 #include <SimpleDHT.h>
 #include <SoftwareSerial.h>;
-
-
-int pinDHT11 = 14; // пин data сенсора dth14 к D5 esp8266
 SimpleDHT11 dht11;
-char lcd_temperature_text[256];
-char lcd_humidity_text[256];
+
+
+/**
+ *       _________
+ *      |         |
+ *      |  DTH11  | 
+ *      |         |
+ *      |_________|
+ *        |  |  |
+ *     
+ *        |  |  |
+ *        |  |  |
+ *        |  |  |
+ *      GND 3V3 D5(14)
+ *       _|__|__|_
+ *      |         |
+ *      | ESP8266 |
+ *      |_________|
+ */
+int pinDHT11 = 14; // пин data сенсора dth14 к D5 esp8266
+
+//char lcd_temperature_text[256];
+//char lcd_humidity_text[256];
 
 // Arduino ESP8266
 //#define D7 13
@@ -96,10 +114,9 @@ void timeSync() {
 
   // Show time
   time_t tnow = time(nullptr);
-  Serial.print("Synchronized time: ");
-  Serial.println(String(ctime(&tnow)));
+  log((String)"Synchronized time: " + String(ctime(&tnow)));
+  //Serial.println(String(ctime(&tnow)));
 }
-
 
 String ipAddress2String(const IPAddress& ipAddress)
 {
@@ -140,11 +157,11 @@ void setup() {
 
   // Check server connection
   if (client.validateConnection()) {
-    Serial.print("Connected to InfluxDB: ");
-    Serial.println(client.getServerUrl());
+    log((String)"Connected to InfluxDB: " + client.getServerUrl());
+//    Serial.println(client.getServerUrl());
   } else {
-    Serial.print("InfluxDB connection failed: ");
-    Serial.println(client.getLastErrorMessage());
+    log_error((String)"InfluxDB connection failed: " + client.getLastErrorMessage());
+    //Serial.println(client.getLastErrorMessage());
   }
 }
 
@@ -168,20 +185,33 @@ void setup() {
 
 
 
-int send_humidity_temperature() {
-  byte data[40] = {0};
-  byte temperature = 0;
-  byte humidity = 0;
-
-  if (getTH(&temperature, &humidity) < 0) {
-    Serial.println("Nothing to send to the InfluxDB because an error was occured on DTH11");
-    //return -1;
+int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity) {
+  //byte data[40] = {0};
+  //byte temperature = 0;
+  //byte humidity = 0;
+  sensor_dth11.clearFields();
+  sensor_dth11.addField("temperature" , temperature[0]);
+  sensor_dth11.addField("humidity"    , humidity[0]);
+  log((String)"Writing dth11: " + sensor_dth11.toLineProtocol());
+  
+  // If no Wifi signal, try to reconnect it
+  if ((WiFi.RSSI() == 0) && (wifiMulti.run() != WL_CONNECTED)){
+    log_error("Wifi connection lost");
+    return -1;
   }
+  // Write point
+  if (!client.writePoint(sensor_dth11)) {
+    log_error((String)"InfluxDB write failed (dth11): " + client.getLastErrorMessage());
+    return -2;
+  }
+  //if (getTH(&temperature, &humidity) < 0) {
+  //  log_error("Nothing to send to the InfluxDB because an error was occured on DTH11");
+  //  //return -1;
+  //}
 
   //Serial.print(humidity); Serial.print(" <==== ");
 
-  sensor_dth11.addField("temperature" , temperature);
-  sensor_dth11.addField("humidity"    , humidity);
+  
  // sensor_dth11.addTag("ip", ipAddress2String(WiFi.localIP()));
   /*
   InfluxData row_temperature("dth11_temperature");
@@ -195,6 +225,7 @@ int send_humidity_temperature() {
   influx.write(row_humidity);
 */
   //  delay(5000);
+  return 0;
 }
 
 /*
@@ -289,83 +320,29 @@ int readCO2()
 */
 
 void loop() {
-  // Store measured value into point
-  //sensor_mhz19.clearFields();
-    sensor_dth11.clearFields();
-    //sensor_dth11.clearTags();
-
- 
-
-  //relay();
-
-  //send_humidity_temperature();
-   byte data[40] = {0};
+  // DTH11
+  byte data[40] = {0};
   byte temperature = 0;
   byte humidity = 0;
 
   if (getTH(&temperature, &humidity) < 0) {
-    Serial.println("Nothing to send to the InfluxDB because an error was occured on DTH11");
+    log_error("Nothing to send to the InfluxDB because an error was occured on DTH11");
     return;
   }
-  Serial.print("pin "); Serial.print(pinDHT11) ; Serial.print(" --> "); Serial.println((int)humidity);
+  log((String)"pinDHT11 ["+pinDHT11+"] humidity: [" + humidity+"]"); //Serial.print(pinDHT11) ; Serial.print(" --> "); Serial.println((int)humidity);
 
   if(checkHumidityExceeded(&humidity)){
     relayCurrentStart();
   }else{
     relayCurrentStop();
   }
-  //UNO
-  // Serial.println(mhz19_getPpm());
-  // ESP (requies 5v current)
-  //Serial.println(readCO2());
- // send_co2();
 
-// Print what are we exactly writing
- // Serial.print("Writing mhz19: ");
- // Serial.println(sensor_mhz19.toLineProtocol());
- 
-  Serial.print("Writing dth11: ");
-  Serial.println(sensor_dth11.toLineProtocol());
-  // If no Wifi signal, try to reconnect it
-  if ((WiFi.RSSI() == 0) && (wifiMulti.run() != WL_CONNECTED))
-    Serial.println("Wifi connection lost");
-  // Write point
-  if (!client.writePoint(sensor_dth11)) {
-    Serial.print("InfluxDB write failed (dth11): ");
-    Serial.println(client.getLastErrorMessage());
-  }
-  /*
-  if (!client.writePoint(sensor_mhz19)) {
-    Serial.print("InfluxDB write failed (mhz19): ");
-    Serial.println(client.getLastErrorMessage());
-  }
-  */
+  // InfluxDB
+  send_humidity_temperature_to_influxdb(&temperature, &humidity);
   
-  //Wait 10s
-  Serial.println("Wait 10s");
+  // Wait
+  log("Wait 10s");
   delay(10000);
-  
-  /*
-  // Store measured value into point
-  sensor.clearFields();
-  // Report RSSI of currently connected network
-  sensor.addField("rssi", WiFi.RSSI());
-  // Print what are we exactly writing
-  Serial.print("Writing: ");
-  Serial.println(sensor.toLineProtocol());
-  // If no Wifi signal, try to reconnect it
-  if ((WiFi.RSSI() == 0) && (wifiMulti.run() != WL_CONNECTED))
-    Serial.println("Wifi connection lost");
-  // Write point
-  if (!client.writePoint(sensor)) {
-    Serial.print("InfluxDB write failed: ");
-    Serial.println(client.getLastErrorMessage());
-  }
-
-  //Wait 10s
-  Serial.println("Wait 10s");
-  delay(10000);
-  */
 }
 
 /**
@@ -374,15 +351,12 @@ void loop() {
  *       -1   - Exceeded
  */
 int checkHumidityExceeded(byte* humidity){
-  //byte* humidityInt = humidity;
-   unsigned int humidityInt = (/*(humidity[2]<<16)+(humidity[1]<<8)+*/humidity[0]);
+  unsigned int humidityInt = (/*(humidity[2]<<16)+(humidity[1]<<8)+*/humidity[0]);
   int HUMIDITY_THRESHOLD = 37;
   if(humidityInt>HUMIDITY_THRESHOLD){
-    //Serial.print((String)"Humidity threshold [" + HUMIDITY_THRESHOLD + "] was excedeed");
     log_warn((String)"Humidity ["+humidityInt+"] threshold [" + HUMIDITY_THRESHOLD + "] was excedeed");
     return -1;
   }else{
-    //Serial.print("Humidity threshold ["); Serial.print(HUMIDITY_THRESHOLD); Serial.println("] was not excedeed");
     log((String)"Humidity ["+humidityInt+"] threshold ["+HUMIDITY_THRESHOLD+"] was not excedeed");
   }
   return 0; // Not exceeded
@@ -402,7 +376,7 @@ void log_error(String str){
 int getTH(byte* temperature, byte* humidity) {
   byte data[40] = {0};
   if (dht11.read(pinDHT11, temperature, humidity, data)) {
-    log("Read DHT11 failed");
+    log_error("Read DHT11 failed");
     return -1;
   }
   //  Serial.print(*temperature); Serial.print(" *C, ");
@@ -414,7 +388,7 @@ int getTH(byte* temperature, byte* humidity) {
  *  Normally-Open configuration send LOW signal to to let current flow
  *  if you are using normally-closed configuration send HIGH signal
  */
-int relayCurrentStop(){
+void relayCurrentStop(){
     digitalWrite(RELAY_PIN, HIGH);
     log("Current not flowing");
 }
@@ -423,7 +397,7 @@ int relayCurrentStop(){
  *  Normally-Open configuration send LOW signal to to let current flow
  *  if you are using normally-closed configuration send HIGH signal
  */
-int relayCurrentStart(){
+void relayCurrentStart(){
   digitalWrite(RELAY_PIN, LOW);
   log_warn("Current flowing...");
 }
