@@ -20,8 +20,8 @@
     #include <ESP8266WiFiMulti.h>
     ESP8266WiFiMulti wifiMulti;
     #define DEVICE "ESP8266"
-    const int RELAY_PIN = 14 //D5
-                          //0  //D3
+    const int RELAY_PIN = //14 //D5
+                          0  //D3
                           ;
 #endif
 
@@ -112,12 +112,13 @@ String ipAddress2String(const IPAddress& ipAddress)
 void setup() {
 //    mySerial.begin(9600);
   Serial.begin(115200);
+
+  // Setup Relay
   pinMode(RELAY_PIN, OUTPUT);
 
   // Setup wifi
   WiFi.mode(WIFI_STA);
   wifiMulti.addAP(WIFI_SSID, WIFI_PASSWORD);
-
   Serial.print("Connecting to wifi");
   while (wifiMulti.run() != WL_CONNECTED) {
     Serial.print(".");
@@ -308,7 +309,11 @@ void loop() {
   }
   Serial.print("pin "); Serial.print(pinDHT11) ; Serial.print(" --> "); Serial.println((int)humidity);
 
-  checkHumidityExceeded(&humidity);
+  if(checkHumidityExceeded(&humidity)){
+    relayCurrentStart();
+  }else{
+    relayCurrentStop();
+  }
   //UNO
   // Serial.println(mhz19_getPpm());
   // ESP (requies 5v current)
@@ -397,7 +402,7 @@ void log_error(String str){
 int getTH(byte* temperature, byte* humidity) {
   byte data[40] = {0};
   if (dht11.read(pinDHT11, temperature, humidity, data)) {
-    Serial.println("Read DHT11 failed");
+    log("Read DHT11 failed");
     return -1;
   }
   //  Serial.print(*temperature); Serial.print(" *C, ");
@@ -405,31 +410,20 @@ int getTH(byte* temperature, byte* humidity) {
   return 0;
 }
 
-int relay(){
-  // Normally-Open configuration send LOW signal to to let current flow
-  // if you are using normally-closed configuration send HIGH signal
-
-  //byte temperature = 0;
-  //byte humidity = 0;
- 
-  //dht11.read(pinDHT11, &temperature, &humidity, NULL);
-
-  //Serial.print(temperature);  Serial.print("*C  "  );
-  //Serial.print(humidity);     Serial.println("% .");
-
-   /*
-  if (humidityInt<=0){
-        Serial.print("Incorrect value of humidity: "); Serial.println(humidityInt);
-        return -1;
-  }
-  */
-  /*
-  if( humidity > 40 ){
-    digitalWrite(RELAY_PIN, LOW);
-    Serial.println("Current flowing...");
-  }else{
+/** Stop current flowing
+ *  Normally-Open configuration send LOW signal to to let current flow
+ *  if you are using normally-closed configuration send HIGH signal
+ */
+int relayCurrentStop(){
     digitalWrite(RELAY_PIN, HIGH);
-    Serial.println("Current not flowing");
-  }
-  */
+    log("Current not flowing");
+}
+
+/** Start current flowing
+ *  Normally-Open configuration send LOW signal to to let current flow
+ *  if you are using normally-closed configuration send HIGH signal
+ */
+int relayCurrentStart(){
+  digitalWrite(RELAY_PIN, LOW);
+  log_warn("Current flowing...");
 }
