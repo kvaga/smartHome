@@ -93,12 +93,12 @@ SimpleDHT11 dht11;
 
 
 /**
- *       _________
- *      |         |
- *      |  DTH11  | 
- *      |         |
- *      |_________|
- *        |  |  |
+ *     ______________
+ *    |              |
+ *    |     DTH11    | 
+ *    |              |
+ *    |______________|
+ *      D5| 3V3| GND|
  *     
  *        |  |  |
  *        |  |  |
@@ -118,17 +118,19 @@ void setup() {
 
   // Setup Relay
   pinMode(RELAY_PIN, OUTPUT);
-
+  relayCurrentStart();
   // Setup wifi
   WiFi.mode(WIFI_STA);
   wifiMulti.addAP(WIFI_SSID, WIFI_PASSWORD);
+  wifiConnect();
+  /*
   Serial.print("Connecting to wifi");
   while (wifiMulti.run() != WL_CONNECTED) {
     Serial.print(".");
     delay(100);
   }
   Serial.println();
-
+*/
   // Setup InfluXDB tags
   sensor_dth11.addTag("device", DEVICE);
   sensor_dth11.addTag("SSID", WiFi.SSID());
@@ -145,6 +147,20 @@ void setup() {
   }
 }
 
+void wifiConnect(){
+  int attempt=0;  
+  Serial.print("Connecting to wifi");
+  while (wifiMulti.run() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(100);
+
+    if(attempt++>5){
+      break;
+    }
+  }
+  Serial.println();
+
+}
 
 void timeSync() {
   // Synchronize UTC time with NTP servers
@@ -214,7 +230,9 @@ void loop() {
   }
 
   // InfluxDB
-  send_humidity_temperature_to_influxdb(&temperature, &humidity);
+  if(send_humidity_temperature_to_influxdb(&temperature, &humidity)==-1){
+    wifiConnect();
+  }
   
   // Wait
   log("Wait 10s");
