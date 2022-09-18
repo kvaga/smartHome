@@ -69,10 +69,84 @@
      *     |_________________|
      */
     const int RELAY_PIN = 0;  //D3
-                         
+  
 #endif
 
+// MQTT
+#include <AsyncMqttClient.h> 
+#define MQTT_HOST IPAddress(130,193,54,253)
+ 
+// Для облачного брокера вводим доменное имя
+ 
+//#define MQTT_HOST "example.com"
+ 
+#define MQTT_PORT 1883
+ 
+ 
+ 
+#define MQTT_USERNAME "mqttuser"
+ 
+#define MQTT_PASSWORD "6c6a8c5696687865"
+ 
+ 
+ 
+// Тестируем брокера
+ 
+#define MQTT_PUB_TEST "test"
+ 
+ 
+ 
+AsyncMqttClient mqttClient;
+ 
+//TimerHandle_t mqttReconnectTimer;
+ 
+//TimerHandle_t wifiReconnectTimer;
 
+unsigned long previousMillis = 0;// Хранит последнее время публикации
+
+const long interval = 5000;// Интервал публикации показаний
+
+
+void connectToMqtt() {
+ 
+Serial.println("Connecting to MQTT...");
+ 
+mqttClient.connect();
+ 
+}
+void onMqttConnect(bool sessionPresent) {
+ 
+Serial.println("Connected to MQTT.");
+ 
+Serial.print("Session present: ");
+ 
+Serial.println(sessionPresent);
+ 
+}
+ 
+ 
+ 
+void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
+ 
+Serial.println("Disconnected from MQTT.");
+ 
+if (WiFi.isConnected()) {
+ 
+//xTimerStart(mqttReconnectTimer, 0);
+ 
+}
+ 
+}
+ void onMqttPublish(uint16_t packetId) {
+ 
+Serial.print("Publish acknowledged.");
+ 
+Serial.print("  packetId: ");
+ 
+Serial.println(packetId);
+ 
+}
+ 
 // Set timezone string according to https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
 // Examples:
 //  Pacific Time: "PST8PDT"
@@ -116,13 +190,37 @@ void setup() {
   // Setup Serial
   Serial.begin(115200);
 
+/*
   // Setup Relay
   pinMode(RELAY_PIN, OUTPUT);
   relayCurrentStart();
+  */
+
+    //mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
+ 
+//wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0, reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
+mqttClient.onConnect(onMqttConnect);
+ 
+mqttClient.onDisconnect(onMqttDisconnect);
+ 
+/*mqttClient.onSubscribe(onMqttSubscribe);
+ 
+mqttClient.onUnsubscribe(onMqttUnsubscribe);*/
+ 
+mqttClient.onPublish(onMqttPublish);
+ 
+mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+ 
+mqttClient.setCredentials(MQTT_USERNAME, MQTT_PASSWORD);
+ 
   // Setup wifi
   WiFi.mode(WIFI_STA);
   wifiMulti.addAP(WIFI_SSID, WIFI_PASSWORD);
   wifiConnect();
+
+
+  connectToMqtt();
+
   /*
   Serial.print("Connecting to wifi");
   while (wifiMulti.run() != WL_CONNECTED) {
@@ -131,6 +229,8 @@ void setup() {
   }
   Serial.println();
 */
+
+/*
   // Setup InfluXDB tags
   sensor_dth11.addTag("device", DEVICE);
   sensor_dth11.addTag("SSID", WiFi.SSID());
@@ -145,6 +245,10 @@ void setup() {
   } else {
     log_error((String)"InfluxDB connection failed: " + client.getLastErrorMessage());
   }
+  */
+
+
+ 
 }
 
 void wifiConnect(){
@@ -211,7 +315,9 @@ int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity) {
   return 0;
 }
 
+int i = 0;
 void loop() {
+  /*
   // DTH11
   byte data[40] = {0};
   byte temperature = 0;
@@ -237,6 +343,34 @@ void loop() {
   // Wait
   log("Wait 10s");
   delay(10000);
+  */
+  unsigned long currentMillis = millis();
+ 
+// Каждые X секунд (у нас интервал 5 секунд)
+ 
+// публикует новое сообщение
+ 
+if (currentMillis - previousMillis >= interval) {
+ 
+// Сохраняем время последней публикации
+ 
+previousMillis = currentMillis;
+ 
+ 
+ 
+String testString = "Hello, world! #" + String(i);
+ 
+// Публикуем тестовое сообщение
+ 
+uint16_t packetIdPub1 = mqttClient.publish(MQTT_PUB_TEST, 1, true, String(testString).c_str());
+ 
+Serial.printf("Publishing on topic %s at QoS 1, packetId: %i", MQTT_PUB_TEST, packetIdPub1);
+ 
+Serial.printf(" Message: %s \n", testString);
+ 
+i++;
+ 
+}
 }
 
 /**
