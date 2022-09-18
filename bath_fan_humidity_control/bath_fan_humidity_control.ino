@@ -219,6 +219,7 @@ void loop() {
 
   if (getTH(&temperature, &humidity) < 0) {
     log_error("Nothing to send to the InfluxDB because an error was occured on DTH11");
+    delay(30000);
     return;
   }
   log((String)"pinDHT11 ["+pinDHT11+"] humidity: [" + humidity+"]"); //Serial.print(pinDHT11) ; Serial.print(" --> "); Serial.println((int)humidity);
@@ -227,7 +228,7 @@ void loop() {
     relayCurrentStart();
   }else{
     relayCurrentStop();
-  }
+  } 
 
   // InfluxDB
   if(send_humidity_temperature_to_influxdb(&temperature, &humidity)==-1){
@@ -246,7 +247,7 @@ void loop() {
  */
 int checkHumidityExceeded(byte* humidity){
   unsigned int humidityInt = (/*(humidity[2]<<16)+(humidity[1]<<8)+*/humidity[0]);
-  int HUMIDITY_THRESHOLD = 45;
+  int HUMIDITY_THRESHOLD = 52;
   if(humidityInt>HUMIDITY_THRESHOLD){
     log_warn((String)"Humidity ["+humidityInt+"] threshold [" + HUMIDITY_THRESHOLD + "] was excedeed");
     return -1;
