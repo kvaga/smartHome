@@ -72,7 +72,7 @@
                          
 #endif
 
-
+String HOSTNAME="bath-humidity";
 // Set timezone string according to https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
 // Examples:
 //  Pacific Time: "PST8PDT"
@@ -87,6 +87,8 @@ InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKE
 // InfluxDB data point
 // Point sensor("wifi_status");
 Point sensor_dth11("dth11");
+
+Point error_code("error_code");
 
 #include <SimpleDHT.h>
 SimpleDHT11 dht11;
@@ -121,6 +123,10 @@ void setup() {
   relayCurrentStart();
   // Setup wifi
   WiFi.mode(WIFI_STA);
+  //Set new hostname
+  WiFi.hostname(HOSTNAME.c_str());
+
+  
   wifiMulti.addAP(WIFI_SSID, WIFI_PASSWORD);
   wifiConnect();
   /*
@@ -135,6 +141,14 @@ void setup() {
   sensor_dth11.addTag("device", DEVICE);
   sensor_dth11.addTag("SSID", WiFi.SSID());
   sensor_dth11.addTag("ip", ipAddress2String(WiFi.localIP()));
+  sensor_dth11.addTag("host",WiFi.hostname().c_str());
+  sensor_dth11.addTag("localtion","home2");
+
+  error_code.addTag("device", DEVICE);
+  error_code.addTag("SSID", WiFi.SSID());
+  error_code.addTag("ip", ipAddress2String(WiFi.localIP()));
+  error_code.addTag("host",WiFi.hostname().c_str());
+  error_code.addTag("location","home2");
 
   // Sync time for certificate validation
   timeSync();
@@ -142,14 +156,16 @@ void setup() {
   // Check server connection
   if (client.validateConnection()) {
     log((String)"Connected to InfluxDB: " + client.getServerUrl());
+    //Get Current Hostname
   } else {
     log_error((String)"InfluxDB connection failed: " + client.getLastErrorMessage());
   }
+  log("Hostname: " + WiFi.hostname());
 }
 
 void wifiConnect(){
   int attempt=0;  
-  Serial.print("Connecting to wifi");
+  Serial.print("\nConnecting to wifi");
   while (wifiMulti.run() != WL_CONNECTED) {
     Serial.print(".");
     delay(100);
@@ -196,6 +212,7 @@ int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity) {
   sensor_dth11.clearFields();
   sensor_dth11.addField("temperature" , temperature[0]);
   sensor_dth11.addField("humidity"    , humidity[0]);
+  
   log((String)"Writing dth11: " + sensor_dth11.toLineProtocol());
   
   // If no Wifi signal, try to reconnect it
@@ -211,14 +228,36 @@ int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity) {
   return 0;
 }
 
+int send_error_code(int errorCode){
+    error_code.clearFields();
+    error_code.addField("code" , errorCode);
+  log((String)"Writing error code: " + error_code.toLineProtocol());
+  
+  // If no Wifi signal, try to reconnect it
+  if ((WiFi.RSSI() == 0) && (wifiMulti.run() != WL_CONNECTED)){
+    log_error("Wifi connection lost");
+    return -1;
+  }
+  // Write point
+  if (!client.writePoint(error_code)) {
+    log_error((String)"InfluxDB write failed (error_code): " + client.getLastErrorMessage());
+    return -2;
+  }
+  return 0;
+}
+
 void loop() {
   // DTH11
   byte data[40] = {0};
   byte temperature = 0;
   byte humidity = 0;
 
+
   if (getTH(&temperature, &humidity) < 0) {
     log_error("Nothing to send to the InfluxDB because an error was occured on DTH11");
+    if(send_error_code(-1)<0){
+      wifiConnect();
+    }
     delay(30000);
     return;
   }
@@ -247,7 +286,7 @@ void loop() {
  */
 int checkHumidityExceeded(byte* humidity){
   unsigned int humidityInt = (/*(humidity[2]<<16)+(humidity[1]<<8)+*/humidity[0]);
-  int HUMIDITY_THRESHOLD = 52;
+  int HUMIDITY_THRESHOLD = 55;
   if(humidityInt>HUMIDITY_THRESHOLD){
     log_warn((String)"Humidity ["+humidityInt+"] threshold [" + HUMIDITY_THRESHOLD + "] was excedeed");
     return -1;
