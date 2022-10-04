@@ -40,6 +40,7 @@
 #include "InfluxDbClient.h"
 #include "InfluxDbCloud.h"
 #include <SoftwareSerial.h>;
+//#include <MemoryFree.h>;
 
 #if defined(ESP32)
     #include <WiFiMulti.h>
@@ -72,7 +73,7 @@
                          
 #endif
 
-String HOSTNAME="bath-humidity";
+const String HOSTNAME="bath-humidity";
 // Set timezone string according to https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
 // Examples:
 //  Pacific Time: "PST8PDT"
@@ -87,8 +88,8 @@ InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKE
 // InfluxDB data point
 // Point sensor("wifi_status");
 Point sensor_dth11("dth11");
-
 Point error_code("error_code");
+Point p_free_heap("free_heap");
 
 #include <SimpleDHT.h>
 SimpleDHT11 dht11;
@@ -111,7 +112,7 @@ SimpleDHT11 dht11;
  *      | ESP8266 |
  *      |_________|
  */
-int pinDHT11 = 14; // пин data сенсора dth14 к D5 esp8266
+const int pinDHT11 = 14; // пин data сенсора dth14 к D5 esp8266
 
 
 void setup() {
@@ -126,9 +127,10 @@ void setup() {
   //Set new hostname
   WiFi.hostname(HOSTNAME.c_str());
 
-  
   wifiMulti.addAP(WIFI_SSID, WIFI_PASSWORD);
   wifiConnect();
+  log("Hostname: " + WiFi.hostname());
+
   /*
   Serial.print("Connecting to wifi");
   while (wifiMulti.run() != WL_CONNECTED) {
@@ -150,6 +152,12 @@ void setup() {
   error_code.addTag("host",WiFi.hostname().c_str());
   error_code.addTag("location","home2");
 
+  p_free_heap.addTag("device", DEVICE);
+  p_free_heap.addTag("SSID", WiFi.SSID());
+  p_free_heap.addTag("ip", ipAddress2String(WiFi.localIP()));
+  p_free_heap.addTag("host",WiFi.hostname().c_str());
+  p_free_heap.addTag("location","home2");
+
   // Sync time for certificate validation
   timeSync();
 
@@ -160,24 +168,47 @@ void setup() {
   } else {
     log_error((String)"InfluxDB connection failed: " + client.getLastErrorMessage());
   }
-  log("Hostname: " + WiFi.hostname());
 }
 
 void wifiConnect(){
-  int attempt=0;  
+  int wifi_connection_attempts_count=150;  
   Serial.print("\nConnecting to wifi");
-  while (wifiMulti.run() != WL_CONNECTED) {
+  while (wifi_connection_attempts_count-- > 0 && wifiMulti.run() != WL_CONNECTED ) {
     Serial.print(".");
     delay(100);
-
-    if(attempt++>150){
-      break;
-    }
+//    wifiMulti.disconnect();
+//    wifiMulti.reconnect();
   }
   Serial.println();
 
 }
 
+int send_memory_metrics(){
+  //F function does the same and is now a built in library, in IDE > 1.0.0
+   Serial.println(F("Free RAM = "));
+  long  fh = ESP.getFreeHeap();
+  char  fhc[20];
+
+  ltoa(fh, fhc, 10);
+  Serial.println(fh);
+  p_free_heap.clearFields();
+  p_free_heap.addField("bytes", fh);
+  log((String)"Writing p_free_heap: " + p_free_heap.toLineProtocol());
+
+  // If no Wifi signal, try to reconnect it
+  if (wifi_connection_lost()){
+    return -1;
+  }
+  // Write point
+  if (!client.writePoint(p_free_heap)) {
+    log_error((String)"InfluxDB write failed (p_free_heap): " + client.getLastErrorMessage());
+    return -2;
+  }
+   // print how much RAM is available.
+//   Serial.println(ramfree(), DEC);
+//      Serial.println(flashfree(), DEC);
+   // print how much flash is available.
+}
 void timeSync() {
   // Synchronize UTC time with NTP servers
   // Accurate time is necessary for certificate validaton and writing in batches
@@ -208,6 +239,14 @@ String ipAddress2String(const IPAddress& ipAddress)
             String(ipAddress[3])  ;
 }
 
+int wifi_connection_lost(){
+  if(/*WiFi.RSSI() == 0 && */ wifiMulti.run() != WL_CONNECTED){
+    log_error((String)"Wifi connection lost");
+    return 1;
+  }else{
+    return 0;
+  }
+}
 int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity) {
   sensor_dth11.clearFields();
   sensor_dth11.addField("temperature" , temperature[0]);
@@ -216,8 +255,7 @@ int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity) {
   log((String)"Writing dth11: " + sensor_dth11.toLineProtocol());
   
   // If no Wifi signal, try to reconnect it
-  if ((WiFi.RSSI() == 0) && (wifiMulti.run() != WL_CONNECTED)){
-    log_error("Wifi connection lost");
+  if (wifi_connection_lost()){
     return -1;
   }
   // Write point
@@ -234,8 +272,7 @@ int send_error_code(int errorCode){
   log((String)"Writing error code: " + error_code.toLineProtocol());
   
   // If no Wifi signal, try to reconnect it
-  if ((WiFi.RSSI() == 0) && (wifiMulti.run() != WL_CONNECTED)){
-    log_error("Wifi connection lost");
+  if (wifi_connection_lost()){
     return -1;
   }
   // Write point
@@ -255,7 +292,7 @@ void loop() {
 
   if (getTH(&temperature, &humidity) < 0) {
     log_error("Nothing to send to the InfluxDB because an error was occured on DTH11");
-    if(send_error_code(-1)<0){
+    if(send_error_code(-1)==-1){
       wifiConnect();
     }
     delay(30000);
@@ -273,7 +310,9 @@ void loop() {
   if(send_humidity_temperature_to_influxdb(&temperature, &humidity)==-1){
     wifiConnect();
   }
-  
+
+   send_memory_metrics();
+
   // Wait
   log("Wait 10s");
   delay(10000);
