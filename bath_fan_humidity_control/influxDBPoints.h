@@ -1,7 +1,6 @@
 // InfluxDB data point
 // Point sensor("wifi_status");
 // Point p_log("log");
-Point p_sensor_dth11("dth11");
 // Point p_error_code("error_code");
 // Point p_monitoring("monitoring");
 
@@ -33,15 +32,20 @@ void addFieldToPoint(Point p, String key, String value){
   p.addField(key, escapeValueSymbolsOfInfluxDBPoint(value));
 }
 
-Point initPoint(char* pointName){
+Point initInfluxDBPoint(char* pointName){
   Point p(pointName);
   p.addTag("device", DEVICE);
-  p.addTag("SSID", WiFi.SSID());
-  p.addTag("ip", ipAddress2String(WiFi.localIP()));
+  // p.addTag("SSID", WiFi.SSID());
+  // p.addTag("ip", ipAddress2String(WiFi.localIP()));
   p.addTag("host",WiFi.hostname().c_str());
-  p.addTag("localtion","home2");
+  p.addTag("location", LOCATION);
   return p;
 }
+
+
+
+
+/*
 void initInfluxDBPoints(){
   // Setup InfluXDB tags
   p_sensor_dth11.addTag("device", DEVICE);
@@ -71,7 +75,7 @@ void initInfluxDBPoints(){
   // p_monitoring.addTag("ESPFlashChipId", (String)ESP.getFlashChipId());//  returns the flash chip ID as a 32-bit integer.
   // p_monitoring.addTag("ESPFlashChipSizeBytes", (String)ESP.getFlashChipSize());//  returns the flash chip size, in bytes, as seen by the SDK (may be less than actual size).
   // p_monitoring.addTag("ESPFlashChipRealSizeBytes", (String)ESP.getFlashChipRealSize());//  returns the real chip size, in bytes, based on the flash chip ID.
-  // p_monitoring.addTag("ESPFlashChipSpeedHz", (String)ESP.getFlashChipSpeed(/*void*/));//  returns the flash chip frequency, in Hz.
+  // p_monitoring.addTag("ESPFlashChipSpeedHz", (String)ESP.getFlashChipSpeed());//  returns the flash chip frequency, in Hz.
 
   // p_current_humidity_threshold.addTag("device", DEVICE);
   // p_current_humidity_threshold.addTag("SSID", WiFi.SSID());
@@ -85,6 +89,7 @@ void initInfluxDBPoints(){
   // p_log.addTag("host",WiFi.hostname().c_str());
   // p_log.addTag("location","home2");
 }
+*/
 
 int influxdbWritePoint(Point p){
   if (WiFi.waitForConnectResult() != WL_CONNECTED) {
@@ -145,3 +150,16 @@ int sendMonitoringData(){
   }
 }
 */
+
+int send_current_humidity_threshold(int currentHumidityThreshold){
+  //Point p_current_humidity_threshold("current_humidity_threshold");
+  Point p_current_humidity_threshold = initInfluxDBPoint("current_humidity_threshold");
+  p_current_humidity_threshold.clearFields();
+  p_current_humidity_threshold.addField("value" , currentHumidityThreshold);
+  log((String)"Send current humidity threshold: " + p_current_humidity_threshold.toLineProtocol());
+  if (!influxdbWritePoint(p_current_humidity_threshold)) {
+    log_error((String)"InfluxDB write failed (currentHumidityThreshold): " + client.getLastErrorMessage());
+    return PR_INFLUXDB_COULDNT_SEND_METRIC_TO_SERVER;
+  }
+  return PR_SUCCESS;
+}

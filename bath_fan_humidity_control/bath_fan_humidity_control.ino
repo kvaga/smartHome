@@ -78,6 +78,7 @@ Fix of OOM: https://github.com/esp8266/Arduino/issues/6811
 #endif
 #include "constants.h"
 #include <credentials.h>
+
 #include "InfluxDbClient.h"
 #include "InfluxDbCloud.h"
 #include "lib_log.h"
@@ -171,7 +172,7 @@ void timeSync() {
 
 void initInfluxDB(){
   log("Init of influXDB started");
-  initInfluxDBPoints();
+  // initInfluxDBPoints();
   // Sync time for certificate validation
   timeSync();
 
@@ -261,6 +262,7 @@ int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity, int
   if(humidity<=0){
     return -1;
   }
+  Point p_sensor_dth11 = initInfluxDBPoint("dth11");
   p_sensor_dth11.clearFields();
   p_sensor_dth11.addField("temperature" , temperature[0]);
   p_sensor_dth11.addField("humidity"    , humidity[0]);
@@ -277,18 +279,6 @@ int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity, int
 }
 
 
-int send_current_humidity_threshold(int currentHumidityThreshold){
-  //Point p_current_humidity_threshold("current_humidity_threshold");
-  Point p_current_humidity_threshold = initPoint("current_humidity_threshold");
-  p_current_humidity_threshold.clearFields();
-  p_current_humidity_threshold.addField("value" , currentHumidityThreshold);
-  log((String)"Send current humidity threshold: " + p_current_humidity_threshold.toLineProtocol());
-  if (!influxdbWritePoint(p_current_humidity_threshold)) {
-    log_error((String)"InfluxDB write failed (currentHumidityThreshold): " + client.getLastErrorMessage());
-    return PR_INFLUXDB_COULDNT_SEND_METRIC_TO_SERVER;
-  }
-  return PR_SUCCESS;
-}
 
 //byte data[40] = {0};
 byte temperature = 0;

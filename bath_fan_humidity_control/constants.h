@@ -8,6 +8,8 @@ const int HUMIDITY_DELTA_FOR_FINISH=1;
 int HUMIDITY_THRESHOLD = 50;
 
 const String HOSTNAME="kitchen-humidity";
+
+const char* LOCATION = "home2";
 // const String HOSTNAME="bath-humidity";
 // const String HOSTNAME="test-humidity";
 
