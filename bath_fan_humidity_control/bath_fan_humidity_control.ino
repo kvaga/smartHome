@@ -40,7 +40,7 @@
 Fix of OOM: https://github.com/esp8266/Arduino/issues/6811
 */
 #define _stackSize (6748/4) 
-
+//#define INFLUXDB_CLIENT_DEBUG_ENABLE
 
 #if defined(ESP32)
     #include <WiFiMulti.h>
@@ -79,12 +79,12 @@ Fix of OOM: https://github.com/esp8266/Arduino/issues/6811
 #include "constants.h"
 #include <credentials.h>
 #include "InfluxDbClient.h"
-#include "influxDBPoints.h"
 #include "InfluxDbCloud.h"
+#include "lib_log.h"
 
 InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, InfluxDbCloud2CACert);
+#include "influxDBPoints.h"
 
-#include "lib_log.h"
 #include "webserver.h"
 
 void initWifi(){
@@ -185,28 +185,11 @@ void initInfluxDB(){
   log("Init of influxDB finished");
 }
 
-void setup() {
-  // Setup Serial
-  Serial.begin(115200);
-  log("Setup started");
-
-  // Setup Relay
-  pinMode(RELAY_PIN, OUTPUT);
-  relayCurrentStart();
-  initWifi();
-  wifiConnect();
- 
-  //send_error_code(PR_STARTED);
-  log("Setup of wifi finished");
-  initInfluxDB();
-  webserver_init();
-  int EEPROM_HUMIDIDITY=0;
- 
-  //currentHumidityThreshold=55;//HUMIDITY_THRESHOLD;
-}
-
+long wifiConnectTimer=0;
 void wifiConnect(){
-  int wifi_connection_attempts_count=550;  
+  if(millis()-wifiConnectTimer>5000){
+    wifiConnectTimer=millis();
+  
 //  if(wifiMulti.run() != WL_CONNECTED){
     uint8_t status = WiFi.waitForConnectResult();
     switch (status){
@@ -233,11 +216,16 @@ void wifiConnect(){
     Serial.println();
     Serial.printf("Connection status digital code: %d\n", WiFi.status());
     Serial.print("RRSI: "); Serial.println(WiFi.RSSI());
+  
+  /*
   if(status != WL_CONNECTED){
       log_error("Connecting to wifi because there is no connection to wifi");
   }else{
     return;
   }
+  
+    int wifi_connection_attempts_count=550;  
+
   while (wifi_connection_attempts_count-- > 0 ) {
     //if(wifiMulti.run() != WL_CONNECTED){
       
@@ -257,6 +245,7 @@ void wifiConnect(){
       break;
     }
   }
+  
   if(wifi_connection_attempts_count<=0){
     log_warn("Sleep 30 seconds before restart...");
     delay(30000);
@@ -264,66 +253,37 @@ void wifiConnect(){
     //send_error_code(PR_FORCED_REBOOT);
     ESP.restart();
   }
-}
-
-
-int sendMonitoringData(){
-  //F function does the same and is now a built in library, in IDE > 1.0.0
-   Serial.println(F("Free RAM = "));
-  long  fh = ESP.getFreeHeap();
-  char  fhc[20];
-  ltoa(fh, fhc, 10);
-  Serial.println(fh);
-  p_monitoring.clearFields();
-  p_monitoring.addField("FreeHeapBytes", fh);
-  //fields:
-  //ESP.getFreeHeap() returns a String containing the last reset reason in human readable format.
-  p_monitoring.addField("HeapFragmentationPercent", ESP.getHeapFragmentation()); //returns the fragmentation metric (0% is clean, more than ~50% is not harmless)
-  p_monitoring.addField("MaxFreeBlockSize", ESP.getMaxFreeBlockSize()); // returns the largest contiguous free RAM block in the heap, useful for checking heap fragmentation. NOTE: Maximum malloc() -able block will be smaller due to memory manager overheads.
-  p_monitoring.addField("FlashCRC", ESP.checkFlashCRC()); // Alert!!! calculates the CRC of the program memory (not including any filesystems) and compares it to the one embedded in the image. If this call returns false then the flash has been corrupted. At that point, you may want to consider trying to send a MQTT message, to start a re-download of the application, blink a LED in an SOS pattern, etc. However, since the flash is known corrupted at this point there is no guarantee the app will be able to perform any of these operations, so in safety critical deployments an immediate shutdown to a fail-safe mode may be indicated.
-
-// ESP.getVcc() may be used to measure supply voltage. ESP needs to reconfigure the ADC at startup in order for this feature to be available. Add the following line to the top of your sketch to use getVcc:
-// ADC_MODE(ADC_VCC);
-// TOUT pin has to be disconnected in this mode.
-// Note that by default ADC is configured to read from TOUT pin using analogRead(A0), and ESP.getVCC() is not available.
-
-  log((String)"Writing p_monitoring: " + p_monitoring.toLineProtocol());
-
-  // If no Wifi signal, try to reconnect it
-//  if (wifi_connection_lost()){
-//    return -1;
-//  }
-  // Write point
-  if (!client.writePoint(p_monitoring)) {
-    log_error((String)"InfluxDB write failed (p_monitoring): " + client.getLastErrorMessage());
-    return PR_INFLUXDB_COULDNT_SEND_METRIC_TO_SERVER;
+  */
   }
-   // print how much RAM is available.
-//   Serial.println(ramfree(), DEC);
-//      Serial.println(flashfree(), DEC);
-   // print how much flash is available.
 }
 
-int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity) {
+int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity, int currentHumidityThreshold) {
+  if(humidity<=0){
+    return -1;
+  }
   p_sensor_dth11.clearFields();
   p_sensor_dth11.addField("temperature" , temperature[0]);
   p_sensor_dth11.addField("humidity"    , humidity[0]);
   
   log((String)"Writing dth11: " + p_sensor_dth11.toLineProtocol());
   
-  if (!client.writePoint(p_sensor_dth11)) {
+  if (!influxdbWritePoint(p_sensor_dth11)) {
     log_error((String)"InfluxDB write failed (dth11): " + client.getLastErrorMessage());
     return PR_INFLUXDB_COULDNT_SEND_METRIC_TO_SERVER;
   }
+  send_current_humidity_threshold(currentHumidityThreshold);
+
   return PR_SUCCESS;
 }
 
 
 int send_current_humidity_threshold(int currentHumidityThreshold){
+  //Point p_current_humidity_threshold("current_humidity_threshold");
+  Point p_current_humidity_threshold = initPoint("current_humidity_threshold");
   p_current_humidity_threshold.clearFields();
   p_current_humidity_threshold.addField("value" , currentHumidityThreshold);
   log((String)"Send current humidity threshold: " + p_current_humidity_threshold.toLineProtocol());
-  if (!client.writePoint(p_current_humidity_threshold)) {
+  if (!influxdbWritePoint(p_current_humidity_threshold)) {
     log_error((String)"InfluxDB write failed (currentHumidityThreshold): " + client.getLastErrorMessage());
     return PR_INFLUXDB_COULDNT_SEND_METRIC_TO_SERVER;
   }
@@ -336,25 +296,28 @@ byte humidity = 0;
 boolean isError=false;
 boolean firstStart=true;
 
+/*
 void checkESPJustStarted(){
   if(firstStart){
     firstStart=false;
+    
     p_log.clearFields();
     // p_log.clearTags();
     //p_log.addField("value" , 1);
     // p_log.addField("info",escapeValueSymbolsOfInfluxDBPoint((String)"ESP Started"));
     p_log.addField("info", (String)"ESP Started: " + ESP.getResetReason());
+    
     // p_log.addField("reason", ESP.getResetReason());
     //addFieldToPoint(p_log, "info", "ESP Started");
-    log((String)"Send log message: " + p_log.toLineProtocol());
-    if (!client.writePoint(p_log)) {
+     log((String)"Send log message: " + p_log.toLineProtocol());
+    if (!influxdbWritePoint(p_log)) {
         Serial.println("[ERROR] " + (String)"InfluxDB write failed (p_log): " + client.getLastErrorMessage());
     }
   }
 }
-
+*/
 void loop() {
-  checkESPJustStarted();
+  // checkESPJustStarted();
   if(read(EEPROM_HUMIDIDITY)){
     currentHumidityThreshold=read(EEPROM_HUMIDIDITY);
   }else{
@@ -386,8 +349,8 @@ void loop() {
   webserverHandleClient();
   
   // InfluxDB
-  send_humidity_temperature_to_influxdb(&temperature, &humidity);
-  sendMonitoringData();
+  send_humidity_temperature_to_influxdb(&temperature, &humidity, currentHumidityThreshold);
+  // sendMonitoringData();
   //send_error_code(PR_SUCCESSFUL_LOOP_ITERATION);
 
   wifiConnect();
@@ -400,12 +363,11 @@ void loop() {
     currentHumidityThreshold=read(EEPROM_HUMIDIDITY)?read(EEPROM_HUMIDIDITY):HUMIDITY_THRESHOLD;
   }
 
-  send_current_humidity_threshold(currentHumidityThreshold);
-  if(isError){
-    log_error((String)"Sleep for 10000 due to error occured");
-    delay(10000);
-    isError=false;
-  }
+  // if(isError){
+  //   log_error((String)"Sleep for 10000 due to error occured");
+  //   delay(10000);
+  //   isError=false;
+  // }
 }
 
 /**
@@ -479,3 +441,26 @@ boolean isRelayWorking(){
     return false;
   }
 }
+
+ADC_MODE(ADC_VCC);
+
+void setup() {
+ 
+  // Setup Serial
+  Serial.begin(115200);
+  log("Setup started");
+  // Setup Relay
+  pinMode(RELAY_PIN, OUTPUT);
+  relayCurrentStart();
+  initWifi();
+  wifiConnect();
+ 
+  //send_error_code(PR_STARTED);
+  log("Setup of wifi finished");
+  initInfluxDB();
+  webserver_init();
+  int EEPROM_HUMIDIDITY=0;
+ 
+  //currentHumidityThreshold=55;//HUMIDITY_THRESHOLD;
+}
+

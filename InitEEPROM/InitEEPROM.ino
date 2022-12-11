@@ -1,6 +1,6 @@
-#include <EEPROM.h>
-#include "../bath_fan_humidity_control/eeprom.h"
+
 #include <SoftwareSerial.h>;
+#include "../bath_fan_humidity_control/bath_fan_humidity_control/eeprom.h";
 
 const int EEPROM_HOSTNAME=2;
 

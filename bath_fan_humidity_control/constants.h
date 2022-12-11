@@ -7,7 +7,7 @@ const byte PR_ERROR									=-1;
 const int HUMIDITY_DELTA_FOR_FINISH=1;
 int HUMIDITY_THRESHOLD = 50;
 
-// const String HOSTNAME="kitchen-humidity";
+const String HOSTNAME="kitchen-humidity";
 // const String HOSTNAME="bath-humidity";
-const String HOSTNAME="test-humidity";
+// const String HOSTNAME="test-humidity";
 
