@@ -17,21 +17,25 @@
 // }
 
 
-String ipAddress2String(const IPAddress& ipAddress)
-{
-    return  String(ipAddress[0]) + String(".") + \
-            String(ipAddress[1]) + String(".") + \
-            String(ipAddress[2]) + String(".") + \
-            String(ipAddress[3])  ;
-}
+// String ipAddress2String(const IPAddress& ipAddress)
+// {
+//     return  String(ipAddress[0]) + String(".") + \
+//             String(ipAddress[1]) + String(".") + \
+//             String(ipAddress[2]) + String(".") + \
+//             String(ipAddress[3])  ;
+// }
 
 String escapeValueSymbolsOfInfluxDBPoint(String value){
-  value.replace(" ", "\\ ");
+  value.replace(F(" "), F("\\ "));
 }
 void addFieldToPoint(Point p, String key, String value){
   p.addField(key, escapeValueSymbolsOfInfluxDBPoint(value));
 }
+const char* PROGMEM POINT_NAME_DTH11="dth11";
+Point p_sensor_dth11(POINT_NAME_DTH11);
+// Point p_current_humidity_threshold("current_humidity_threshold");
 
+/*
 Point initInfluxDBPoint(char* pointName){
   Point p(pointName);
   p.addTag("device", DEVICE);
@@ -41,18 +45,18 @@ Point initInfluxDBPoint(char* pointName){
   p.addTag("location", LOCATION);
   return p;
 }
+*/
 
 
 
 
-/*
 void initInfluxDBPoints(){
   // Setup InfluXDB tags
-  p_sensor_dth11.addTag("device", DEVICE);
-  p_sensor_dth11.addTag("SSID", WiFi.SSID());
-  p_sensor_dth11.addTag("ip", ipAddress2String(WiFi.localIP()));
-  p_sensor_dth11.addTag("host",WiFi.hostname().c_str());
-  p_sensor_dth11.addTag("localtion","home2");
+  // p_sensor_dth11.addTag("device", DEVICE);
+  // p_sensor_dth11.addTag("SSID", WiFi.SSID());
+  // p_sensor_dth11.addTag("ip", ipAddress2String(WiFi.localIP()));
+  p_sensor_dth11.addTag(F("host"),WiFi.hostname().c_str());
+  p_sensor_dth11.addTag(F("localtion"),"home2");
 
   // p_error_code.addTag("device", DEVICE);
   // p_error_code.addTag("SSID", WiFi.SSID());
@@ -89,8 +93,9 @@ void initInfluxDBPoints(){
   // p_log.addTag("host",WiFi.hostname().c_str());
   // p_log.addTag("location","home2");
 }
-*/
 
+
+/*
 int influxdbWritePoint(Point p){
   if (WiFi.waitForConnectResult() != WL_CONNECTED) {
     Serial.println("Wifi connection lost");
@@ -104,7 +109,7 @@ int influxdbWritePoint(Point p){
  client.flushBuffer();
  return status;
 }
-
+*/
 
 
 /*
@@ -124,14 +129,14 @@ int sendMonitoringData(){
   //ESP.getFreeHeap() returns a String containing the last reset reason in human readable format.
   p_monitoring.addField("HeapFragmentationPercent", ESP.getHeapFragmentation()); //returns the fragmentation metric (0% is clean, more than ~50% is not harmless)
   p_monitoring.addField("MaxFreeBlockSize", ESP.getMaxFreeBlockSize()); // returns the largest contiguous free RAM block in the heap, useful for checking heap fragmentation. NOTE: Maximum malloc() -able block will be smaller due to memory manager overheads.
-  p_monitoring.addField("FlashCRC", ESP.checkFlashCRC()); // Alert!!! calculates the CRC of the program memory (not including any filesystems) and compares it to the one embedded in the image. If this call returns false then the flash has been corrupted. At that point, you may want to consider trying to send a MQTT message, to start a re-download of the application, blink a LED in an SOS pattern, etc. However, since the flash is known corrupted at this point there is no guarantee the app will be able to perform any of these operations, so in safety critical deployments an immediate shutdown to a fail-safe mode may be indicated.
-  p_monitoring.addField("Vcc", ESP.getVcc());
+  //p_monitoring.addField("FlashCRC", ESP.checkFlashCRC()); // Alert!!! calculates the CRC of the program memory (not including any filesystems) and compares it to the one embedded in the image. If this call returns false then the flash has been corrupted. At that point, you may want to consider trying to send a MQTT message, to start a re-download of the application, blink a LED in an SOS pattern, etc. However, since the flash is known corrupted at this point there is no guarantee the app will be able to perform any of these operations, so in safety critical deployments an immediate shutdown to a fail-safe mode may be indicated.
+  //p_monitoring.addField("Vcc", ESP.getVcc());
 // ESP.getVcc() may be used to measure supply voltage. ESP needs to reconfigure the ADC at startup in order for this feature to be available. Add the following line to the top of your sketch to use getVcc:
 // ADC_MODE(ADC_VCC);
 // TOUT pin has to be disconnected in this mode.
 // Note that by default ADC is configured to read from TOUT pin using analogRead(A0), and ESP.getVCC() is not available.
 
-  log((String)"Writing p_monitoring: " + p_monitoring.toLineProtocol());
+  log((String)F("Writing p_monitoring: ") + p_monitoring.toLineProtocol());
 
   // If no Wifi signal, try to reconnect it
 //  if (wifi_connection_lost()){
@@ -140,7 +145,7 @@ int sendMonitoringData(){
   // Write point
   //if (!client.writePoint(p_monitoring)) {
     if(!influxdbWritePoint(p_monitoring)){
-    log_error((String)"InfluxDB write failed (p_monitoring: ["+p_monitoring.toLineProtocol()+"], httpCode: "+client.getLastStatusCode()+"): " + client.getLastErrorMessage());
+    log_error((String)F("InfluxDB write failed (p_monitoring: [")+p_monitoring.toLineProtocol()+F("], httpCode: ")+client.getLastStatusCode()+F("): ") + client.getLastErrorMessage());
     return PR_INFLUXDB_COULDNT_SEND_METRIC_TO_SERVER;
   }
    // print how much RAM is available.
@@ -151,6 +156,7 @@ int sendMonitoringData(){
 }
 */
 
+/*
 int send_current_humidity_threshold(int currentHumidityThreshold){
   //Point p_current_humidity_threshold("current_humidity_threshold");
   Point p_current_humidity_threshold = initInfluxDBPoint("current_humidity_threshold");
@@ -163,3 +169,4 @@ int send_current_humidity_threshold(int currentHumidityThreshold){
   }
   return PR_SUCCESS;
 }
+*/

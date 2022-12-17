@@ -1,15 +1,15 @@
-const byte PR_SUCCESS								=1;
-const byte PR_STARTED								=3;
-const byte PR_SUCCESSFUL_LOOP_ITERATION				=0;
-const byte PR_FORCED_REBOOT							=-3;
-const byte PR_INFLUXDB_COULDNT_SEND_METRIC_TO_SERVER=-2;
-const byte PR_ERROR									=-1;
-const int HUMIDITY_DELTA_FOR_FINISH=1;
-int HUMIDITY_THRESHOLD = 50;
+const byte PROGMEM PR_SUCCESS								=1;
+const byte PROGMEM PR_STARTED								=3;
+const byte PROGMEM PR_SUCCESSFUL_LOOP_ITERATION				=0;
+const byte PROGMEM PR_FORCED_REBOOT							=-3;
+const byte PROGMEM PR_INFLUXDB_COULDNT_SEND_METRIC_TO_SERVER=-2;
+const byte PROGMEM PR_ERROR									=-1;
+const int PROGMEM HUMIDITY_DELTA_FOR_FINISH=1;
+const int PROGMEM HUMIDITY_THRESHOLD_DEFAULT_VALUE = 50;
 
-const String HOSTNAME="kitchen-humidity";
+const char*  PROGMEM LOCATION = "home2";
 
-const char* LOCATION = "home2";
+// const String HOSTNAME="kitchen-humidity";
 // const String HOSTNAME="bath-humidity";
-// const String HOSTNAME="test-humidity";
+const char*  PROGMEM HOSTNAME="test-humidity";
 

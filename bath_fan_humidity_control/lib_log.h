@@ -1,18 +1,18 @@
 #include "debug.h"
 String get_debug_info_as_string(){
   #if defined(DEBUG_MODE)
-    return (String) " [DEBUG] ramfree="+ramfree() + ", flashfree=" + flashfree();
+    return (String) F(" [DEBUG] ramfree=")+ramfree() + F(", flashfree=") + flashfree();
      //Serial.println(ramfree(), DEC);
 //      Serial.println(flashfree(), DEC);
   #else
-    return "";
+    return F("");
   #endif
 }
 void log(String str){
-  Serial.println("[INFO] " + str + get_debug_info_as_string());
+  Serial.println(F("[INFO] ") + str + get_debug_info_as_string());
 }
 void log_warn(String str){
-  Serial.println("[WARN] " + str + get_debug_info_as_string());
+  Serial.println(F("[WARN] ") + str + get_debug_info_as_string());
   // p_log.clearFields();
   // p_log.addField("warn", str);
   //p_log.addField("count", 1);
@@ -22,7 +22,7 @@ void log_warn(String str){
   // }
 }
 void log_error(String str){
-  Serial.println("[ERROR] " + str + get_debug_info_as_string());
+  Serial.println(F("[ERROR] ") + str + get_debug_info_as_string());
   // p_log.clearFields();
   // p_log.addField("error", str);
   // //p_log.addField("count", 1);

@@ -39,7 +39,7 @@
 /**
 Fix of OOM: https://github.com/esp8266/Arduino/issues/6811
 */
-#define _stackSize (6748/4) 
+// #define _stackSize (6748/4) 
 //#define INFLUXDB_CLIENT_DEBUG_ENABLE
 
 #if defined(ESP32)
@@ -51,7 +51,7 @@ Fix of OOM: https://github.com/esp8266/Arduino/issues/6811
 //    ESP8266WiFiMulti wifiMulti;
     #include <ESP8266WiFi.h>
     #include <WiFiClient.h>
-    #include <ESP8266WebServer.h>
+    //#include <ESP8266WebServer.h>
     #include <ESP8266mDNS.h>
     #define DEVICE "ESP8266"
 
@@ -82,26 +82,26 @@ Fix of OOM: https://github.com/esp8266/Arduino/issues/6811
 #include "InfluxDbClient.h"
 #include "InfluxDbCloud.h"
 #include "lib_log.h"
-
+#include "eeprom.h"
 InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN, InfluxDbCloud2CACert);
 #include "influxDBPoints.h"
 
 #include "webserver.h"
 
 void initWifi(){
-  log("Init of wifi started");
+  log(F("Init of wifi started"));
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
-  WiFi.hostname(HOSTNAME.c_str());
+  WiFi.hostname(HOSTNAME /*HOSTNAME.c_str()*/);
   //wifiConnect();
   //wifiMulti.addAP(WIFI_SSID, WIFI_PASSWORD);
-  log((String)"Connected to wifi: " + WiFi.SSID() +  ", hostname=" + WiFi.hostname().c_str());
-  log((String)"ip=" + WiFi.localIP().toString());
+  log((String)F("Connected to wifi: ") + WiFi.SSID() +  F(", hostname=") + WiFi.hostname().c_str());
+  log((String)F("ip=") + WiFi.localIP().toString());
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
-  log("Init of wifi stoped");
+  log(F("Init of wifi stoped"));
 }
 
 // InfluxDB client instance with preconfigured InfluxCloud certificate
@@ -119,7 +119,7 @@ unsigned long timing;
 #include <SimpleDHT.h>
 SimpleDHT11 dht11;
 
-int currentHumidityThreshold;//=55;//HUMIDITY_THRESHOLD;
+byte currentHumidityThreshold=0;//=55;//HUMIDITY_THRESHOLD_DEFAULT_VALUE;
 
 /**
  *     ______________
@@ -138,7 +138,7 @@ int currentHumidityThreshold;//=55;//HUMIDITY_THRESHOLD;
  *      | ESP8266 |
  *      |_________|
  */
-const int pinDHT11 = 14; // пин data сенсора dth14 к D5 esp8266
+const int PROGMEM pinDHT11 = 14; // пин data сенсора dth14 к D5 esp8266
 // void log(String str){
 //   Serial.println("[INFO] " + str);
 // }
@@ -149,6 +149,9 @@ const int pinDHT11 = 14; // пин data сенсора dth14 к D5 esp8266
 //   Serial.println("[ERROR] " + str);
 // }
 
+// const PROGMEM __FlashStringHelper* TIMESYNC_CONFIGTIME_SITE1 = "pool.ntp.org";
+// const PROGMEM __FlashStringHelper* TIMESYNC_CONFIGTIME_SITE2 = "time.nis.gov";
+
 void timeSync() {
   // Synchronize UTC time with NTP servers
   // Accurate time is necessary for certificate validaton and writing in batches
@@ -157,33 +160,33 @@ void timeSync() {
   setenv("TZ", TZ_INFO, 1);
 
   // Wait till time is synced
-  log("Syncing time");
+  log(F("Syncing time"));
   int i = 0;
   while (time(nullptr) < 1000000000ul && i < 100) {
-    Serial.print(".");
+    Serial.print(F("."));
     delay(100);
     i++;
   }
-  log("");
+  log(F(""));
   // Show time
   time_t tnow = time(nullptr);
-  log((String)"Synchronized time: " + String(ctime(&tnow)));
+  log((String)F("Synchronized time: ") + String(ctime(&tnow)));
 }
 
 void initInfluxDB(){
-  log("Init of influXDB started");
-  // initInfluxDBPoints();
+  log(F("Init of influXDB started"));
+  initInfluxDBPoints();
   // Sync time for certificate validation
   timeSync();
 
   // Check server connection
   if (client.validateConnection()) {
-    log((String)"Connected to InfluxDB: " + client.getServerUrl());
+    log((String)F("Connected to InfluxDB: ") + client.getServerUrl());
     //Get Current Hostname
   } else {
-    log_error((String)"InfluxDB connection failed: " + client.getLastErrorMessage());
+    log_error((String)F("InfluxDB connection failed: ") + client.getLastErrorMessage());
   }
-  log("Init of influxDB finished");
+  log(F("Init of influxDB finished"));
 }
 
 long wifiConnectTimer=0;
@@ -195,28 +198,28 @@ void wifiConnect(){
     uint8_t status = WiFi.waitForConnectResult();
     switch (status){
       case WL_NO_SSID_AVAIL:
-        log("Connection status text: configured SSID cannot be reached"); break;
+        log(F("Connection status text: configured SSID cannot be reached")); break;
       case WL_CONNECTED:
-        log("Connection status text: connection successfully established");
+        log(F("Connection status text: connection successfully established"));
         return;
         break;
       case WL_CONNECT_FAILED:
-        Serial.print("Connection status text: connection failed");
+        Serial.print(F("Connection status text: connection failed"));
         break;
       case WL_NO_SHIELD:
-        Serial.print("Connection status text: WL_NO_SHIELD"); break;  
+        Serial.print(F("Connection status text: WL_NO_SHIELD")); break;  
       case WL_IDLE_STATUS:
-        Serial.print("Connection status text: WL_IDLE_STATUS"); break;
+        Serial.print(F("Connection status text: WL_IDLE_STATUS")); break;
       case WL_SCAN_COMPLETED:
-        Serial.print("Connection status text: WL_SCAN_COMPLETED"); break;
+        Serial.print(F("Connection status text: WL_SCAN_COMPLETED")); break;
       case WL_DISCONNECTED:
-        Serial.print("Connection status text: WL_DISCONNECTED"); break;
+        Serial.print(F("Connection status text: WL_DISCONNECTED")); break;
       case WL_CONNECTION_LOST:
-        Serial.print("Connection status text: WL_CONNECTION_LOST"); break;
+        Serial.print(F("Connection status text: WL_CONNECTION_LOST")); break;
     }
     Serial.println();
-    Serial.printf("Connection status digital code: %d\n", WiFi.status());
-    Serial.print("RRSI: "); Serial.println(WiFi.RSSI());
+    Serial.print(F("Connection status digital code: %d\n")); Serial.println(WiFi.status());
+    Serial.print(F("RRSI: ")); Serial.println(WiFi.RSSI());
   
   /*
   if(status != WL_CONNECTED){
@@ -258,22 +261,28 @@ void wifiConnect(){
   }
 }
 
-int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity, int currentHumidityThreshold) {
+int send_humidity_temperature_to_influxdb(byte* temperature, byte* humidity) {
   if(humidity<=0){
     return -1;
   }
-  Point p_sensor_dth11 = initInfluxDBPoint("dth11");
+ // Point p_sensor_dth11 = initInfluxDBPoint("dth11");
   p_sensor_dth11.clearFields();
-  p_sensor_dth11.addField("temperature" , temperature[0]);
-  p_sensor_dth11.addField("humidity"    , humidity[0]);
+  p_sensor_dth11.addField(F("temperature") , temperature[0]);
+  p_sensor_dth11.addField(F("humidity")    , humidity[0]);
+  p_sensor_dth11.addField(F("current_HUMIDITY_THRESHOLD_DEFAULT_VALUE")    , currentHumidityThreshold);
   
-  log((String)"Writing dth11: " + p_sensor_dth11.toLineProtocol());
+  log((String)F("Writing dth11: ") + p_sensor_dth11.toLineProtocol());
   
-  if (!influxdbWritePoint(p_sensor_dth11)) {
-    log_error((String)"InfluxDB write failed (dth11): " + client.getLastErrorMessage());
+  //if (!influxdbWritePoint(p_sensor_dth11)) {
+    if(!client.writePoint(p_sensor_dth11)){
+    log_error((String)F("InfluxDB write failed (p_sensor_dth11): ") + client.getLastErrorMessage());
     return PR_INFLUXDB_COULDNT_SEND_METRIC_TO_SERVER;
   }
-  send_current_humidity_threshold(currentHumidityThreshold);
+  // if(!client.writePoint(p_current_HUMIDITY_THRESHOLD_DEFAULT_VALUE)){
+  //   log_error((String)"InfluxDB write failed (p_current_HUMIDITY_THRESHOLD_DEFAULT_VALUE): " + client.getLastErrorMessage());
+  //   return PR_INFLUXDB_COULDNT_SEND_METRIC_TO_SERVER;
+  // }
+  //send_current_HUMIDITY_THRESHOLD_DEFAULT_VALUE(currentHumidityThreshold);
 
   return PR_SUCCESS;
 }
@@ -306,28 +315,31 @@ void checkESPJustStarted(){
   }
 }
 */
+
+void update_current_humidity_threshold(){
+  if(currentHumidityThreshold==0){
+      currentHumidityThreshold=EEPROM.read(EEPROM_ADDR_HUMIDIDITY);
+  }else{
+    return;
+  }  
+}
+
 void loop() {
   // checkESPJustStarted();
-  if(read(EEPROM_HUMIDIDITY)){
-    currentHumidityThreshold=read(EEPROM_HUMIDIDITY);
-  }else{
-    currentHumidityThreshold=HUMIDITY_THRESHOLD;
-    save(EEPROM_HUMIDIDITY, currentHumidityThreshold);
-  }
-
+  update_current_humidity_threshold();
   // DTH11
   //data[40] = {0};
   if (getTH(&temperature, &humidity) < 0) {
-    log_error("Nothing to send to the InfluxDB because an error was occured on DTH11");
+    log_error(F("Nothing to send to the InfluxDB because an error was occured on DTH11"));
     //send_error_code(-1);
     isError=true;
     //return;
   }
-  log((String)"pinDHT11 ["+pinDHT11+"] humidity: [" + humidity+"]"); //Serial.print(pinDHT11) ; Serial.print(" --> "); Serial.println((int)humidity);
+  log((String)F("pinDHT11 [")+pinDHT11+F("] humidity: [") + humidity+F("]")); //Serial.print(pinDHT11) ; Serial.print(" --> "); Serial.println((int)humidity);
 
 
 
-  log((String) "Current Humidity Threshold: " + String(currentHumidityThreshold));
+  log((String) F("Current Humidity Threshold: ") + String(currentHumidityThreshold));
 
   if(checkHumidityExceeded(&humidity)){
     relayCurrentStart();
@@ -335,11 +347,12 @@ void loop() {
     relayCurrentStop();
   } 
 
-  webserverUpdateCurrentHumidityValue(int(humidity));
+
+  // webserverUpdateCurrentHumidityValue(int(humidity));
   webserverHandleClient();
-  
+
   // InfluxDB
-  send_humidity_temperature_to_influxdb(&temperature, &humidity, currentHumidityThreshold);
+  send_humidity_temperature_to_influxdb(&temperature, &humidity);
   // sendMonitoringData();
   //send_error_code(PR_SUCCESSFUL_LOOP_ITERATION);
 
@@ -347,12 +360,14 @@ void loop() {
   
   // Check current value of humidity control against threshold and delta
   if(isRelayWorking()){
-    //currentHumidityThreshold=HUMIDITY_THRESHOLD-HUMIDITY_DELTA_FOR_FINISH;
-    currentHumidityThreshold=(read(EEPROM_HUMIDIDITY)?read(EEPROM_HUMIDIDITY):HUMIDITY_THRESHOLD) - HUMIDITY_DELTA_FOR_FINISH;
+    //currentHumidityThreshold=HUMIDITY_THRESHOLD_DEFAULT_VALUE-HUMIDITY_DELTA_FOR_FINISH;
+    currentHumidityThreshold=EEPROM.read(EEPROM_ADDR_HUMIDIDITY) - HUMIDITY_DELTA_FOR_FINISH;
   }else{
-    currentHumidityThreshold=read(EEPROM_HUMIDIDITY)?read(EEPROM_HUMIDIDITY):HUMIDITY_THRESHOLD;
+    currentHumidityThreshold=EEPROM.read(EEPROM_ADDR_HUMIDIDITY);
   }
 
+  //Must be in the loop() to be able access esp8266.local address
+  //MDNS.update();
   // if(isError){
   //   log_error((String)"Sleep for 10000 due to error occured");
   //   delay(10000);
@@ -366,12 +381,12 @@ void loop() {
  *       -1   - Exceeded
  */
 int checkHumidityExceeded(byte* humidity){
-  unsigned int humidityInt = (/*(humidity[2]<<16)+(humidity[1]<<8)+*/humidity[0]);
-  if(humidityInt>currentHumidityThreshold){
-    log_warn((String)"Humidity ["+humidityInt+"] threshold [" + currentHumidityThreshold + "] was excedeed");
+  //unsigned int humidityInt = (/*(humidity[2]<<16)+(humidity[1]<<8)+*/humidity[0]);
+  if(humidity[0] /*humidityInt*/>currentHumidityThreshold){
+    log_warn((String)F("Humidity [")+humidity[0]+F("] threshold [") + currentHumidityThreshold + F("] was excedeed"));
     return -1;
   }else{
-    log((String)"Humidity ["+humidityInt+"] threshold ["+currentHumidityThreshold+"] was not excedeed");
+    log((String)F("Humidity [")+humidity[0]+F("] threshold [")+currentHumidityThreshold+F("] was not excedeed"));
   }
   return 0; // Not exceeded
 }
@@ -380,10 +395,10 @@ int checkHumidityExceeded(byte* humidity){
 int getTH(byte* temperature, byte* humidity) {
   if (millis() - timing > 10000){ // Вместо 10000 подставьте нужное вам значение паузы 
     timing = millis(); 
-    log("10 seconds elapsed after previous reading DTH11. Let's read once again");
+    log(F("10 seconds elapsed after previous reading DTH11. Let's read once again"));
     byte data[40] = {0};
     if (dht11.read(pinDHT11, temperature, humidity, data)) {
-      log_error("Read DHT11 failed");
+      log_error(F("Read DHT11 failed"));
       return -1;
 
     // Test Mode
@@ -407,7 +422,7 @@ int getTH(byte* temperature, byte* humidity) {
  */
 void relayCurrentStop(){
     digitalWrite(RELAY_PIN, LOW);
-    log("Current not flowing");
+    log(F("Current not flowing"));
 }
 
 /** Start current flowing
@@ -416,11 +431,11 @@ void relayCurrentStop(){
  */
 void relayCurrentStart(){
   digitalWrite(RELAY_PIN, HIGH);
-  log_warn("Current flowing...");
+  log_warn(F("Current flowing..."));
 }
 
 boolean relayStatus(){
-  log((String)"Relay status: " + (digitalRead(RELAY_PIN) == HIGH ? "working" : "stopped"));
+  log((String)F("Relay status: ") + (digitalRead(RELAY_PIN) == HIGH ? F("working") : F("stopped")));
   return digitalRead(RELAY_PIN);
 }
 
@@ -434,23 +449,25 @@ boolean isRelayWorking(){
 
 ADC_MODE(ADC_VCC);
 
+
 void setup() {
  
   // Setup Serial
   Serial.begin(115200);
-  log("Setup started");
+  log(F("Setup started"));
   // Setup Relay
   pinMode(RELAY_PIN, OUTPUT);
   relayCurrentStart();
   initWifi();
   wifiConnect();
- 
   //send_error_code(PR_STARTED);
-  log("Setup of wifi finished");
+  log(F("Setup of wifi finished"));
   initInfluxDB();
+  init_eeprom();
+  
   webserver_init();
-  int EEPROM_HUMIDIDITY=0;
+  
  
-  //currentHumidityThreshold=55;//HUMIDITY_THRESHOLD;
+  //currentHumidityThreshold=55;//HUMIDITY_THRESHOLD_DEFAULT_VALUE;
 }
 

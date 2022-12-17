@@ -6,4 +6,4 @@ When error message doesn't help to explain the bad behavior, go to the library s
 #define INFLUXDB_CLIENT_DEBUG_ENABLE
 */
 
-// #define DEBUG_MODE 
+// const uint8_t PROGMEM DEBUG_MODE=1 
